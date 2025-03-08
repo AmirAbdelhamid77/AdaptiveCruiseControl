@@ -1,0 +1,4 @@
+../stm_drivers/RCC.c:37:10:MCAL_RCC_GETSYSCLKfreq	4	static
+../stm_drivers/RCC.c:66:10:MCAL_RCC_GETHCLKfreq	8	static
+../stm_drivers/RCC.c:72:10:MCAL_RCC_GETPCLK1Freq	8	static
+../stm_drivers/RCC.c:77:11:MCAL_RCC_GETPCLK2Freq	8	static
