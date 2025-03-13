@@ -106,6 +106,9 @@ int main(void)
       ACC_Update();
       lastAccUpdateTime = systemTicks;
     }
+    
+    /* Process sensor data for collision detection and obstacle avoidance */
+    ProcessSensorData();
   }
 }
 
@@ -286,69 +289,60 @@ static void ACC_Update(void)
   /* Get distance to vehicle in front */
   uint16_t frontDistance_cm = HAL_ULTRASONIC_GetLastDistance(ULTRASONIC_FRONT);
   
-  /* ACC logic */
-  if (frontDistance_cm == ULTRASONIC_INVALID_DISTANCE) {
-    /* No vehicle detected in front, maintain target speed */
-    if (currentSpeed_kmh < AccConfig.targetSpeed_kmh - ACC_SPEED_TOLERANCE_KMH) {
-      /* Need to accelerate */
-      AccConfig.state = ACC_STATE_ACCELERATING;
-      MOTOR_Move(MOTOR_SPEED_FAST, 0);  // Move forward at fast speed, no turning
-    }
-    else if (currentSpeed_kmh > AccConfig.targetSpeed_kmh + ACC_SPEED_TOLERANCE_KMH) {
-      /* Need to decelerate */
-      AccConfig.state = ACC_STATE_BRAKING;
-      MOTOR_Move(MOTOR_SPEED_SLOW, 0);  // Move forward at reduced speed
-    }
-    else {
-      /* Maintain current speed */
-      AccConfig.state = ACC_STATE_ACTIVE;
-      MOTOR_Move(MOTOR_SPEED_MAINTAIN, 0);  // Move forward at maintenance speed
-    }
+  /* Calculate target speed based on distance */
+  float targetSpeed = AccConfig.targetSpeed_kmh;
+  
+  if (frontDistance_cm != ULTRASONIC_INVALID_DISTANCE && 
+      frontDistance_cm < ACC_MAX_FOLLOW_DISTANCE_CM) {
+    /* Adjust target speed based on distance to vehicle in front */
+    float distanceRatio = (float)(frontDistance_cm - ACC_MIN_FOLLOW_DISTANCE_CM) / 
+                         (float)(ACC_MAX_FOLLOW_DISTANCE_CM - ACC_MIN_FOLLOW_DISTANCE_CM);
+    targetSpeed = distanceRatio * AccConfig.targetSpeed_kmh;
+    
+    /* Limit to minimum safe speed */
+    if (targetSpeed < 0) targetSpeed = 0;
   }
-  else {
-    /* Vehicle detected in front */
-    if (frontDistance_cm < ACC_MIN_FOLLOW_DISTANCE_CM) {
-      /* Too close, need to brake */
-      AccConfig.state = ACC_STATE_BRAKING;
-      MOTOR_Move(MOTOR_SPEED_STOP, 0);  // Stop
-    }
-    else if (frontDistance_cm > ACC_MAX_FOLLOW_DISTANCE_CM) {
-      /* Far enough, can accelerate up to target speed */
-      if (currentSpeed_kmh < AccConfig.targetSpeed_kmh - ACC_SPEED_TOLERANCE_KMH) {
-        AccConfig.state = ACC_STATE_ACCELERATING;
-        MOTOR_Move(MOTOR_SPEED_FAST, 0);  // Move forward at fast speed
-      }
-      else {
-        AccConfig.state = ACC_STATE_ACTIVE;
-        MOTOR_Move(MOTOR_SPEED_MAINTAIN, 0);  // Maintain speed
-      }
-    }
-    else {
-      /* In the follow distance range, adjust speed based on distance */
-      /* Calculate desired speed proportional to distance */
-      float distanceRatio = (float)(frontDistance_cm - ACC_MIN_FOLLOW_DISTANCE_CM) / 
-                           (float)(ACC_MAX_FOLLOW_DISTANCE_CM - ACC_MIN_FOLLOW_DISTANCE_CM);
-      float desiredSpeed = distanceRatio * AccConfig.targetSpeed_kmh;
-      
-      /* Limit desired speed to target speed */
-      if (desiredSpeed > AccConfig.targetSpeed_kmh) {
-        desiredSpeed = AccConfig.targetSpeed_kmh;
-      }
-      
-      /* Adjust motor speed based on desired speed */
-      if (currentSpeed_kmh < desiredSpeed - ACC_SPEED_TOLERANCE_KMH) {
-        AccConfig.state = ACC_STATE_ACCELERATING;
-        MOTOR_Move(40, 0);  // Accelerate moderately
-      }
-      else if (currentSpeed_kmh > desiredSpeed + ACC_SPEED_TOLERANCE_KMH) {
-        AccConfig.state = ACC_STATE_BRAKING;
-        MOTOR_Move(20, 0);  // Decelerate moderately
-      }
-      else {
-        AccConfig.state = ACC_STATE_ACTIVE;
-        MOTOR_Move(30, 0);  // Maintain speed
-      }
-    }
+  
+  /* PID control for smoother speed transitions */
+  float error = targetSpeed - currentSpeed_kmh;
+  pid_integral += error * (ACC_UPDATE_RATE_MS / 1000.0f);
+  float derivative = (error - pid_previous_error) / (ACC_UPDATE_RATE_MS / 1000.0f);
+  
+  /* Calculate PID output */
+  float pid_output = (PID_KP * error) + (PID_KI * pid_integral) + (PID_KD * derivative);
+  pid_previous_error = error;
+  
+  /* Convert PID output to motor speed (0-100%) */
+  int target_motor_speed = (int)(pid_output * 10.0f + 30.0f); // Scale and offset
+  
+  /* Apply speed ramping for smoother transitions */
+  if (target_motor_speed > current_motor_speed + SPEED_RAMP_RATE) {
+    current_motor_speed += SPEED_RAMP_RATE;
+  } else if (target_motor_speed < current_motor_speed - SPEED_RAMP_RATE) {
+    current_motor_speed -= SPEED_RAMP_RATE;
+  } else {
+    current_motor_speed = target_motor_speed;
+  }
+  
+  /* Clamp motor speed to valid range */
+  if (current_motor_speed > 100) current_motor_speed = 100;
+  if (current_motor_speed < 0) current_motor_speed = 0;
+  
+  /* Update ACC state based on conditions */
+  if (frontDistance_cm != ULTRASONIC_INVALID_DISTANCE && 
+      frontDistance_cm < ACC_MIN_FOLLOW_DISTANCE_CM) {
+    /* Too close, need to brake */
+    AccConfig.state = ACC_STATE_BRAKING;
+    MOTOR_Move(MOTOR_SPEED_STOP, 0);  // Stop
+  } else if (current_motor_speed < 10) {
+    AccConfig.state = ACC_STATE_BRAKING;
+    MOTOR_Move(current_motor_speed, 0);
+  } else if (current_motor_speed > 40) {
+    AccConfig.state = ACC_STATE_ACCELERATING;
+    MOTOR_Move(current_motor_speed, 0);
+  } else {
+    AccConfig.state = ACC_STATE_ACTIVE;
+    MOTOR_Move(current_motor_speed, 0);
   }
 }
 
@@ -446,7 +440,6 @@ void SysTick_Handler(void)
 {
   systemTicks++;
   
-  /* TODO: Add any time-critical operations here */
 }
 
 /**

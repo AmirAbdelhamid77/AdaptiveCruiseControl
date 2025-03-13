@@ -8,7 +8,8 @@
   * @attention
   *
   * This file contains all hardware-specific configurations including
-  * pin mappings, timer settings, and (peripheral assignments)->activate If needed.
+  * pin mappings, timer settings, and (peripheral assignments)->some 
+    of them need activation in case of need.
   *
   ******************************************************************************
   */

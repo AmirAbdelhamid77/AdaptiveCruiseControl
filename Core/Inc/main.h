@@ -2,14 +2,10 @@
   ******************************************************************************
   * @file           : main.h
   * @brief          : Header for main.c file.
-  *                   This file contains the common defines and function prototypes
-  *                   for the ADAS and V2X project.
-  * @author         : ADAS Team
-  * @date           : 2024
+ 
   ******************************************************************************
   */
 
-/* Define to prevent recursive inclusion -------------------------------------*/
 #ifndef __MAIN_H
 #define __MAIN_H
 
@@ -20,11 +16,7 @@ extern "C" {
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f103x6.h"
 
-/* Exported types ------------------------------------------------------------*/
 
-/* Exported constants --------------------------------------------------------*/
-
-/* Exported macro ------------------------------------------------------------*/
 
 /* Exported functions prototypes ---------------------------------------------*/
 void HAL_Init(void);
@@ -64,6 +56,6 @@ extern uint32_t SystemCoreClock;
 }
 #endif
 
-#endif /* __MAIN_H */
+#endif 
 
-/************************ (C) COPYRIGHT ADAS Team *****END OF FILE****/
+
