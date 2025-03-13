@@ -2,11 +2,11 @@
  * 		ultrasonic_driver.c
  *
  *  Created on: AnotherSomeDay
- *      Author: AMiR & C.
+ *      Author: AMiR & Co.
  *      Description: HC-SR04 Ultrasonic driver for STM32F103C8T6
  */
 
-#include "stm32_ultrasonic_driver.h"
+#include "ultrasonic_driver.h"
 
 //-----------------------------
 // Static Variables
