@@ -32,34 +32,34 @@ $(wildcard ../makefile.init) \
 $(wildcard ../makefile.targets) \
 
 
-BUILD_ARTIFACT_NAME := ACC
+BUILD_ARTIFACT_NAME := AdaptiveCruiseControl
 BUILD_ARTIFACT_EXTENSION := elf
 BUILD_ARTIFACT_PREFIX :=
 BUILD_ARTIFACT := $(BUILD_ARTIFACT_PREFIX)$(BUILD_ARTIFACT_NAME)$(if $(BUILD_ARTIFACT_EXTENSION),.$(BUILD_ARTIFACT_EXTENSION),)
 
 # Add inputs and outputs from these tool invocations to the build variables 
 EXECUTABLES += \
-ACC.elf \
+AdaptiveCruiseControl.elf \
 
 MAP_FILES += \
-ACC.map \
+AdaptiveCruiseControl.map \
 
 SIZE_OUTPUT += \
 default.size.stdout \
 
 OBJDUMP_LIST += \
-ACC.list \
+AdaptiveCruiseControl.list \
 
 
 # All Target
 all: main-build
 
 # Main-build Target
-main-build: ACC.elf secondary-outputs
+main-build: AdaptiveCruiseControl.elf secondary-outputs
 
 # Tool invocations
-ACC.elf ACC.map: $(OBJS) $(USER_OBJS) D:\DOCUMENTARY\EDU\ TUTORIALS\FastBit\Embedded-C\My-workspace\target\ACC\STM32F103C8TX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "ACC.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m3 -T"D:\DOCUMENTARY\EDU TUTORIALS\FastBit\Embedded-C\My-workspace\target\ACC\STM32F103C8TX_FLASH.ld" --specs=nosys.specs -Wl,-Map="ACC.map" -Wl,--gc-sections -static --specs=nano.specs -mfloat-abi=soft -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+AdaptiveCruiseControl.elf AdaptiveCruiseControl.map: $(OBJS) $(USER_OBJS) D:\DOCUMENTARY\EDU\ TUTORIALS\FastBit\Embedded-C\My-workspace\target\AdaptiveCruiseControl\STM32F103C8TX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "AdaptiveCruiseControl.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m3 -T"D:\DOCUMENTARY\EDU TUTORIALS\FastBit\Embedded-C\My-workspace\target\AdaptiveCruiseControl\STM32F103C8TX_FLASH.ld" --specs=nosys.specs -Wl,-Map="AdaptiveCruiseControl.map" -Wl,--gc-sections -static --specs=nano.specs -mfloat-abi=soft -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
@@ -68,14 +68,14 @@ default.size.stdout: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
 	@echo 'Finished building: $@'
 	@echo ' '
 
-ACC.list: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-objdump -h -S $(EXECUTABLES) > "ACC.list"
+AdaptiveCruiseControl.list: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-objdump -h -S $(EXECUTABLES) > "AdaptiveCruiseControl.list"
 	@echo 'Finished building: $@'
 	@echo ' '
 
 # Other Targets
 clean:
-	-$(RM) ACC.elf ACC.list ACC.map default.size.stdout
+	-$(RM) AdaptiveCruiseControl.elf AdaptiveCruiseControl.list AdaptiveCruiseControl.map default.size.stdout
 	-@echo ' '
 
 secondary-outputs: $(SIZE_OUTPUT) $(OBJDUMP_LIST)

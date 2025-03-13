@@ -408,3 +408,208 @@ void TIM2_IRQHandler(void)
         overflowCount++;
     }
 }
+
+/**
+ * @discreption: Get current time in microseconds
+ * @note Using configured timer to track microseconds
+ */
+static uint32_t micros(void)
+{
+    // Return the current timer value
+    // Timer is configured to count microseconds (1MHz frequency)
+    return ULTRASONIC_TIMER->CNT + (overflowCount * ULTRASONIC_PERIOD);
+}
+
+/**
+ * @brief Timer interrupt handler
+ * Note: This function needs to be properly defined in the startup file
+ * or the appropriate IRQ handler file based on which timer is used
+ */
+void TIM2_IRQHandler(void)
+{
+    if (TIM2->SR & TIM_SR_UIF) {
+        // Clear the update interrupt flag
+        TIM2->SR &= ~TIM_SR_UIF;
+        
+        // Increment overflow counter
+        overflowCount++;
+    }
+}
+
+/**
+ * @@discreption: Trigger a distance measurement for a single sensor
+ */
+uint8_t HAL_ULTRASONIC_Trigger(ULTRASONIC_Config_t* Sensor)
+{
+    if (Sensor == NULL) {
+        return ULTRASONIC_ERROR;
+    }
+
+    // Set Trigger pin to LOW for clean state
+    MCAL_GPIO_WritePin(Sensor->TRIG_Port, Sensor->TRIG_Pin, GPIO_PIN_RESET);
+    delay_us(2);
+    
+    // Send 10us trigger pulse
+    MCAL_GPIO_WritePin(Sensor->TRIG_Port, Sensor->TRIG_Pin, GPIO_PIN_SET);
+    delay_us(10);
+    MCAL_GPIO_WritePin(Sensor->TRIG_Port, Sensor->TRIG_Pin, GPIO_PIN_RESET);
+    
+    return ULTRASONIC_OK;
+}
+
+/**
+ * @discreption: Read the distance from a sensor (blocking mode)
+  */
+uint8_t HAL_ULTRASONIC_Read(ULTRASONIC_Config_t* Sensor, uint16_t* Distance)
+{
+    uint32_t start_time, current_time, timeout_time;
+    uint32_t pulse_duration;
+    uint16_t distance;
+    
+    if (Sensor == NULL || Distance == NULL) {
+        return ULTRASONIC_ERROR;
+    }
+    
+    // Wait for echo pin to go HIGH (start of echo pulse)
+    timeout_time = micros() + ULTRASONIC_TIMEOUT;
+    while (MCAL_GPIO_ReadPin(Sensor->ECHO_Port, Sensor->ECHO_Pin) == GPIO_PIN_RESET) {
+        current_time = micros();
+        if (current_time > timeout_time) {
+            *Distance = ULTRASONIC_INVALID_DISTANCE;
+            return ULTRASONIC_TIMEOUT_ERROR;
+        }
+    }
+    
+    // Record start time
+    start_time = micros();
+    
+    // Wait for echo pin to go LOW (end of echo pulse)
+    timeout_time = start_time + ULTRASONIC_TIMEOUT;
+    while (MCAL_GPIO_ReadPin(Sensor->ECHO_Port, Sensor->ECHO_Pin) == GPIO_PIN_SET) {
+        current_time = micros();
+        if (current_time > timeout_time) {
+            *Distance = ULTRASONIC_INVALID_DISTANCE;
+            return ULTRASONIC_TIMEOUT_ERROR;
+        }
+    }
+    
+    // Calculate pulse duration
+    pulse_duration = micros() - start_time;
+
+    // Calculate distance (sound travels at ~343m/s )
+    // Distance = (time * speed of sound) / 2 (for Go & back)
+    // Speed of sound = 343 m/s = 0.0343 cm/us
+    // Distance (cm) = (pulse_duration * 0.0343) / 2
+    distance = (pulse_duration * 343) / 20000;
+    
+    // Validate distance
+    if (distance > ULTRASONIC_MAX_DISTANCE) {
+        *Distance = ULTRASONIC_MAX_DISTANCE;
+    } else {
+        *Distance = distance;
+    }
+    
+    // Update last distance
+    Sensor->LastDistance = *Distance;
+    
+    return ULTRASONIC_OK;
+}
+
+/**
+ * @discreption Measure the distance from a sensor (blocking mode)
+ */
+uint8_t HAL_ULTRASONIC_MeasureDistance(ULTRASONIC_Config_t* Sensor, uint16_t* Distance)
+{
+    uint8_t status;
+    
+    if (Sensor == NULL || Distance == NULL) {
+        return ULTRASONIC_ERROR;
+    }
+    
+    // Trigger the sensor
+    status = HAL_ULTRASONIC_Trigger(Sensor);
+    if (status != ULTRASONIC_OK) {
+        return status;
+    }
+    
+    // Small delay to allow the signal to start
+    delay_us(50);
+    
+    // Read the distance
+    return HAL_ULTRASONIC_Read(Sensor, Distance);
+}
+
+/**
+ * @discreption Measure the distance from a sensor by ID (blocking mode)
+ */
+uint8_t HAL_ULTRASONIC_MeasureDistanceByID(uint8_t SensorID, uint16_t* Distance)
+{
+    if (!Initialized || SensorID >= ULTRASONIC_COUNT || Distance == NULL) {
+        return ULTRASONIC_ERROR;
+    }
+    
+    return HAL_ULTRASONIC_MeasureDistance(&Ultrasonic_Sensors[SensorID], Distance);
+}
+
+/**
+ * @discreption Measure distances from all sensors (blocking mode)
+  */
+uint8_t HAL_ULTRASONIC_MeasureAllDistances(uint16_t Distances[ULTRASONIC_COUNT])
+{
+    uint8_t status = ULTRASONIC_OK;
+    uint8_t result;
+
+    if (!Initialized || Distances == NULL) {
+        return ULTRASONIC_ERROR;
+    }
+    
+    // Measure distance from each sensor
+    for (uint8_t i = 0; i < ULTRASONIC_COUNT; i++) {
+        result = HAL_ULTRASONIC_MeasureDistance(&Ultrasonic_Sensors[i], &Distances[i]);
+        if (result != ULTRASONIC_OK) {
+            Distances[i] = ULTRASONIC_INVALID_DISTANCE;
+            status = ULTRASONIC_ERROR;
+        }
+
+        // Adding a small delay between measurements to avoid cross-interference
+        delay_us(10000);  // 10ms delay
+    }
+    
+    return status;
+}
+
+/**
+ * @discreption: Get the last measured distance from a sensor
+ */
+uint16_t HAL_ULTRASONIC_GetLastDistance(uint8_t SensorID)
+{
+    if (!Initialized || SensorID >= ULTRASONIC_COUNT) {
+        return ULTRASONIC_INVALID_DISTANCE;
+    }
+    
+    return Ultrasonic_Sensors[SensorID].LastDistance;
+}
+
+/**
+ * @discreption: Microsecond delay function
+ * => Number of microseconds to delay
+ * @assuming this function is for system that's clock is 72MHz
+ */
+static void delay_us(uint32_t us)
+{
+    uint32_t start = micros();
+    uint32_t end = start + us;
+    
+    // Handle potential overflow
+    if (end < start) {
+        // Wait until overflow occurs
+        while (micros() >= start) {}
+        // Then wait until we reach the target time
+        while (micros() < end) {}
+    } else {
+        // Normal case, no overflow
+        while (micros() < end) {}
+    }
+}
+
+

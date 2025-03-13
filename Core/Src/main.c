@@ -171,6 +171,9 @@ static void GPIO_Init(void)
   */
 static void Motors_Init(void)
 {
+  // Initialize all members of CarConfig to safe defaults first
+  memset(&CarConfig, 0, sizeof(Car_Config_t));
+  
   /* Motor 1 (Front Left) */
   CarConfig.Motors[MOTOR_1].IN1_Port = MOTOR1_IN1_PORT;
   CarConfig.Motors[MOTOR_1].IN1_Pin = MOTOR1_IN1_PIN;
@@ -582,7 +585,7 @@ static void Timers_Init(void)
   RCC->APB1ENR |= RCC_APB1ENR_TIM3EN;
   
   /* Configure TIM3 for microsecond timing */
-  /* Set prescaler to get a 1MHz clock (implementing 72MHz system clock) */
+  /* Setting prescaler to get a 1MHz clock (implementing 72MHz system clock) */
   /* 72MHz / 72 = 1MHz = 1us per count */
   TIM3->PSC = 72 - 1;
   
